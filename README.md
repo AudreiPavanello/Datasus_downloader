@@ -2,7 +2,7 @@
 
 Shiny app to download data from the Brazilian Health System using the Microdatasus Package.
 
-Credits to <https://github.com/rfsaldanha/microdatasus> from the development of the microdatasus package.
+Credits to <https://github.com/rfsaldanha/microdatasus> for the development of the microdatasus package.
 
 Citation:
 
