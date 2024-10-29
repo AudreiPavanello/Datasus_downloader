@@ -39,10 +39,10 @@ ui <- page_sidebar(
                 choices = estados),
     
     numericInput("ano_inicio", "Ano Inicial:",
-                 value = 2013, min = 1996, max = 2023),
+                 value = 2023, min = 1996, max = 2023),
     
     numericInput("ano_fim", "Ano Final:",
-                 value = 2013, min = 1996, max = 2023),
+                 value = 2023, min = 1996, max = 2023),
     
     # Add radio buttons for file format selection
     radioButtons("formato", "Formato do arquivo:",
