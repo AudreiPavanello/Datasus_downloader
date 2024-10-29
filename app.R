@@ -25,6 +25,13 @@ estados <- c(
   "Tocantins" = "TO"
 )
 
+# List of months in Portuguese with numeric values
+meses <- setNames(1:12, c(
+  "Janeiro", "Fevereiro", "Março", "Abril",
+  "Maio", "Junho", "Julho", "Agosto",
+  "Setembro", "Outubro", "Novembro", "Dezembro"
+))
+
 ui <- page_sidebar(
   title = "Download de Dados do DATASUS",
   theme = bs_theme(bootswatch = "flatly"),
@@ -44,7 +51,17 @@ ui <- page_sidebar(
     numericInput("ano_fim", "Ano Final:",
                  value = 2023, min = 1996, max = 2023),
     
-    # Add radio buttons for file format selection
+    # Add month inputs that appear only for SIH and SIA
+    conditionalPanel(
+      condition = "input.sistema == 'SIH-RD' || input.sistema == 'SIA-PA'",
+      selectInput("mes_inicio", "Mês Inicial:",
+                  choices = meses,
+                  selected = 1),
+      selectInput("mes_fim", "Mês Final:",
+                  choices = meses,
+                  selected = 12)
+    ),
+    
     radioButtons("formato", "Formato do arquivo:",
                  choices = c("Excel (xlsx)" = "xlsx", "CSV" = "csv"),
                  selected = "xlsx"),
@@ -57,8 +74,9 @@ ui <- page_sidebar(
     p("1. Selecione o sistema de informação desejado"),
     p("2. Escolha o estado"),
     p("3. Defina o período (ano inicial e final)"),
-    p("4. Selecione o formato do arquivo"),
-    p("5. Clique em 'Baixar Dados'"),
+    p("4. Para SIH e SIA, selecione também os meses inicial e final"),
+    p("5. Selecione o formato do arquivo"),
+    p("6. Clique em 'Baixar Dados'"),
     p("Obs: Para períodos longos, o download pode demorar alguns minutos.")
   )
 )
@@ -70,13 +88,24 @@ server <- function(input, output, session) {
     # Show a loading message
     withProgress(message = 'Baixando dados...', {
       
-      # Fetch the data
-      dados_brutos <- fetch_datasus(
-        year_start = input$ano_inicio,
-        year_end = input$ano_fim,
-        uf = input$estado,
-        information_system = input$sistema
-      )
+      # Different fetch logic based on the system
+      if (input$sistema %in% c("SIH-RD", "SIA-PA")) {
+        dados_brutos <- fetch_datasus(
+          year_start = input$ano_inicio,
+          year_end = input$ano_fim,
+          month_start = as.numeric(input$mes_inicio),
+          month_end = as.numeric(input$mes_fim),
+          uf = input$estado,
+          information_system = input$sistema
+        )
+      } else {
+        dados_brutos <- fetch_datasus(
+          year_start = input$ano_inicio,
+          year_end = input$ano_fim,
+          uf = input$estado,
+          information_system = input$sistema
+        )
+      }
       
       # Process the data according to the system
       dados_processados <- switch(input$sistema,
@@ -98,20 +127,22 @@ server <- function(input, output, session) {
   # Download handler
   output$download <- downloadHandler(
     filename = function() {
-      paste0("dados_", input$sistema, "_", input$estado, "_",
-             input$ano_inicio, "-", input$ano_fim, ".", input$formato)
+      if (input$sistema %in% c("SIH-RD", "SIA-PA")) {
+        paste0("dados_", input$sistema, "_", input$estado, "_",
+               input$ano_inicio, ".", as.numeric(input$mes_inicio), "-",
+               input$ano_fim, ".", as.numeric(input$mes_fim), ".", input$formato)
+      } else {
+        paste0("dados_", input$sistema, "_", input$estado, "_",
+               input$ano_inicio, "-", input$ano_fim, ".", input$formato)
+      }
     },
     content = function(file) {
       if (input$formato == "csv") {
         write.csv(dados(), file, row.names = FALSE)
       } else {
-        # Create a new workbook
         wb <- createWorkbook()
-        # Add a worksheet
         addWorksheet(wb, "Dados")
-        # Write the data to the worksheet
         writeData(wb, "Dados", dados())
-        # Save the workbook
         saveWorkbook(wb, file, overwrite = TRUE)
       }
     }
