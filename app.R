@@ -31,7 +31,8 @@ ui <- page_fluid(
           tags$li("Clique em 'Visualizar Dados' para ver uma prévia"),
           tags$li("Selecione as colunas desejadas (opcional)"),
           tags$li("Escolha o formato do arquivo"),
-          tags$li("Clique em 'Baixar Dados'")
+          tags$li("Clique em 'Baixar Dados'"),
+          tags$li("De preferência a baixar um único ano por vez, com exceção do sistema SIA, que idealmente deve ser baixado mês a mês")
         ),
         tags$p(
           tags$strong("Obs:"), 
