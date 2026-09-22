@@ -155,9 +155,9 @@ test_that("chave_sonda distingue os recortes", {
                          chave_sonda("SIA-PA", "SP", 2024, 2L)))
 })
 
-test_that("o rótulo do botão diz o que vai acontecer", {
-  expect_equal(rotulo_botao_baixar(0L), "Baixar tudo")
-  expect_equal(rotulo_botao_baixar(NULL), "Baixar tudo")
-  expect_equal(rotulo_botao_baixar(1L), "Baixar 1 coluna")
-  expect_equal(rotulo_botao_baixar(5L), "Baixar 5 colunas")
+test_that("o resumo diz o que o botão vai trazer", {
+  expect_equal(resumo_selecao_colunas(0L), "Todas as colunas")
+  expect_equal(resumo_selecao_colunas(NULL), "Todas as colunas")
+  expect_equal(resumo_selecao_colunas(1L), "1 coluna selecionada")
+  expect_equal(resumo_selecao_colunas(5L), "5 colunas selecionadas")
 })

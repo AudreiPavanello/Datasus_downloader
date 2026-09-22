@@ -311,8 +311,15 @@ sonda_cobre_recorte <- function(p, meta) {
   TRUE
 }
 
-#' Rótulo do botão principal, conforme a seleção de colunas.
-rotulo_botao_baixar <- function(n_colunas) {
-  if (is.null(n_colunas) || n_colunas == 0L) return("Baixar tudo")
-  sprintf("Baixar %d coluna%s", n_colunas, if (n_colunas > 1L) "s" else "")
+#' Descreve o que o botão de download vai trazer.
+#'
+#' Fica numa linha abaixo do botão, e não no rótulo dele: `input_task_button()`
+#' monta o botão com marcação própria para os estados ocioso e ocupado, e
+#' `updateActionButton()` reescreveria esse conteúdo, quebrando o estado
+#' "Baixando...". O `update_task_button()` da bslib só troca `state`, não o
+#' rótulo.
+resumo_selecao_colunas <- function(n_colunas) {
+  if (is.null(n_colunas) || n_colunas == 0L) return("Todas as colunas")
+  sprintf("%d coluna%s selecionada%s", n_colunas,
+          if (n_colunas > 1L) "s" else "", if (n_colunas > 1L) "s" else "")
 }

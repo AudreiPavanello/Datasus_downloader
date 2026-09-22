@@ -134,10 +134,14 @@ mod_download_ui <- function(id) {
       ),
 
       bslib::input_task_button(
-        ns("baixar"), "Baixar tudo",
+        ns("baixar"), "Baixar",
         icon = bsicons::bs_icon("cloud-arrow-down"),
         label_busy = "Baixando...",
         class = "w-100"
+      ),
+      shiny::div(
+        class = "text-muted small text-center mt-1",
+        shiny::textOutput(ns("resumo_selecao"), inline = TRUE)
       ),
 
       shiny::conditionalPanel(
@@ -415,12 +419,10 @@ mod_download_server <- function(id) {
       ))
     })
 
-    # O rótulo do botão principal diz o que ele vai fazer agora, para que
-    # ninguém precise lembrar se selecionou colunas ou não.
-    shiny::observeEvent(input$vars, {
-      shiny::updateActionButton(session, "baixar",
-                                label = rotulo_botao_baixar(length(input$vars)))
-    }, ignoreNULL = FALSE, ignoreInit = TRUE)
+    # Diz o que o botão vai trazer, para ninguém precisar lembrar do que marcou.
+    output$resumo_selecao <- shiny::renderText({
+      resumo_selecao_colunas(length(input$vars))
+    })
 
     shiny::observeEvent(download$status(), {
       estado <- download$status()
