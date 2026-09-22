@@ -1,0 +1,25 @@
+# R
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+
+# renv: o lockfile é versionado, a biblioteca local não
+renv/library/
+renv/staging/
+renv/local/
+renv/python/
+renv/sandbox/
+
+# Deploy
+rsconnect/
+
+# Dados baixados pelo app durante testes
+*.csv
+*.xlsx
+*.rds
+*.parquet
+*.dbc
+*.DBC

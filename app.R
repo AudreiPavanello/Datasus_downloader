@@ -1,81 +1,42 @@
-library(shiny)
-library(bslib)
-library(microdatasus)
-library(dplyr)
-library(openxlsx)
-library(shinyjs)
-library(waiter)
-library(DT)
+# Interface para download de microdados do DATASUS.
+#
+# Este arquivo é só a casca: tema, navegação e chamada dos módulos. Toda a
+# lógica está em R/, carregado automaticamente pelo Shiny.
 
-# Source all modules and helper files
-source("global.R")
-source("R/ui_modules.R")
-source("R/server_modules.R")
+tema <- bslib::bs_theme(
+  version = 5,
+  preset = "shiny",
+  base_font = bslib::font_google("Inter"),
+  heading_font = bslib::font_google("Inter"),
+  "navbar-bg" = "$body-bg"
+)
 
-ui <- page_fluid(
-  useShinyjs(),
-  useWaiter(),
-  
-  navset_card_tab(
-    title = "Download de Dados do DATASUS",
-    
-    nav_panel(
-      title = "Instruções",
-      card(
-        card_header("Como usar"),
-        tags$ol(
-          tags$li("Selecione o sistema de informação desejado"),
-          tags$li("Escolha o estado"),
-          tags$li("Defina o período (ano inicial e final)"),
-          tags$li("Para SIH e SIA, selecione também os meses inicial e final"),
-          tags$li("Clique em 'Visualizar Dados' para ver uma prévia"),
-          tags$li("Selecione as colunas desejadas (opcional)"),
-          tags$li("Escolha o formato do arquivo"),
-          tags$li("Clique em 'Baixar Dados'"),
-          tags$li("De preferência a baixar um único ano por vez, com exceção do sistema SIA, que idealmente deve ser baixado mês a mês")
-        ),
-        tags$p(
-          tags$strong("Obs:"), 
-          "Para períodos longos, o download pode demorar alguns minutos."
-        )
-      )
-    ),
-    
-    nav_panel(
-      title = "Download",
-      downloadTabUI("download")
-    ),
-    
-    nav_panel(
-      title = "Dicionário de Variáveis",
-      dictionaryTabUI("dictionary")
-    ),
-    
-    nav_panel(
-      title = "Sobre",
-      card(
-        card_header("Informações sobre os Sistemas"),
-        
-        h4("SIM-DO (Sistema de Informações sobre Mortalidade)"),
-        p("Contém informações sobre óbitos, incluindo causa mortis, local, data e dados demográficos."),
-        
-        h4("SINASC (Sistema de Informações sobre Nascidos Vivos)"),
-        p("Registra informações sobre nascimentos, incluindo dados da mãe, da gestação e do recém-nascido."),
-        
-        h4("SIH-RD (Sistema de Informações Hospitalares)"),
-        p("Registra todas as internações hospitalares financiadas pelo SUS."),
-        
-        h4("SIA-PA (Sistema de Informações Ambulatoriais)"),
-        p("Contém registros de todos os atendimentos ambulatoriais realizados pelo SUS.")
-      )
+ui <- bslib::page_navbar(
+  title = "Microdados do DATASUS",
+  theme = tema,
+  fillable = "Download",
+  window_title = "Microdados do DATASUS",
+
+  bslib::nav_panel("Download", mod_download_ui("dl")),
+  bslib::nav_panel("Dicionário", mod_dictionary_ui("dic")),
+  bslib::nav_panel("Instruções", mod_instrucoes_ui()),
+  bslib::nav_panel("Sobre", mod_sobre_ui()),
+
+  bslib::nav_spacer(),
+  bslib::nav_item(
+    shiny::tags$a(
+      bsicons::bs_icon("github"), "Código",
+      href = "https://github.com/AudreiPavanello/Datasus_downloader",
+      target = "_blank", class = "nav-link"
     )
-  )
+  ),
+  bslib::nav_item(bslib::input_dark_mode(id = "modo"))
 )
 
 server <- function(input, output, session) {
-  # Call module servers
-  downloadServer("download")
-  dictionaryServer("dictionary")
+  # A sonda do módulo de download alimenta a aba de dicionário.
+  sonda <- mod_download_server("dl")
+  mod_dictionary_server("dic", sonda)
 }
 
 shinyApp(ui, server)
