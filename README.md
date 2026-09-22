@@ -21,20 +21,22 @@ Feito para colegas e alunos que precisam dos dados mas não programam em R.
 
 ## Como usar
 
-O app trabalha em dois passos, e é aí que está a diferença em relação a baixar
-na mão:
+Escolha o conjunto, o estado e o período, e clique em **Baixar tudo**. São três
+passos e é o caminho normal.
 
-1. **Explorar colunas.** Baixa a menor fatia possível do recorte (uma UF, o ano
-   inicial e, se o sistema for mensal, só o mês inicial) apenas para descobrir
-   quais colunas existem.
-2. **Preparar download.** Baixa o período inteiro lendo **somente** as colunas
-   que você escolheu.
+Para recortes grandes existe um atalho que vale muito a pena: clicar em
+**Escolher colunas** antes. O app baixa a menor fatia possível do recorte (uma
+UF, o ano inicial e, se o sistema for mensal, só o mês inicial), lista as
+colunas disponíveis, e o download seguinte lê **somente** as que você marcar.
 
 Os layouts do DATASUS são largos: a produção ambulatorial (SIA-PA) passa de
 uma centena de colunas, e um ano são doze arquivos. Selecionando as colunas
 antes, o microdatasus lê só elas de cada arquivo em vez de carregar tudo e
 descartar depois. Em recortes grandes a diferença é de ordens de grandeza, em
-tempo e em memória.
+tempo e em memória; em recortes pequenos, tanto faz.
+
+Quando a fatia lida para descobrir as colunas já cobre todo o recorte pedido
+(uma UF, um ano, um mês), o app reaproveita esse arquivo e não baixa de novo.
 
 Formatos de saída: CSV (UTF-8 com BOM, abre no Excel com os acentos certos),
 Excel (.xlsx), RDS e, se o pacote `arrow` estiver instalado, Parquet.
@@ -76,6 +78,17 @@ O app checa isso na inicialização e recusa subir com versão antiga, porque o
 
 ```r
 shiny::runApp()
+```
+
+### Processos paralelos
+
+O download roda fora do processo do Shiny, em daemons do
+[mirai](https://mirai.r-lib.org). O default é **um** daemon, porque cada um é um
+processo R que segura o data.frame inteiro durante o download e a instância
+gratuita do shinyapps.io tem 1 GB. Em máquina ou instância maior:
+
+```sh
+DATASUS_DAEMONS=4
 ```
 
 ## Testes

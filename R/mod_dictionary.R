@@ -42,7 +42,7 @@ mod_dictionary_server <- function(id, sonda) {
       if (is.null(t)) {
         return(alerta_ui("info", paste(
           "Nenhum conjunto explorado ainda. Vá em <strong>Download</strong>,",
-          "escolha um recorte e clique em <em>Explorar colunas</em>."
+          "escolha um recorte e clique em <em>Escolher colunas</em>."
         )))
       }
       com_descricao <- sum(nzchar(t$Descricao))
@@ -57,7 +57,7 @@ mod_dictionary_server <- function(id, sonda) {
       t <- tabela()
       shiny::validate(shiny::need(
         !is.null(t),
-        "Explore um conjunto na aba Download para ver o dicionário."
+        "Clique em 'Escolher colunas' na aba Download para ver o dicionário deste conjunto."
       ))
       DT::datatable(
         t,

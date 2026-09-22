@@ -271,3 +271,48 @@ traduzir_erro <- function(msg) {
 
   mensagem_segura(texto)
 }
+
+# ---- Reaproveitamento da sonda --------------------------------------------
+
+#' Chave de cache de uma sonda.
+chave_sonda <- function(sistema, uf, ano, mes) {
+  paste(sistema, uf, as.integer(ano), as.integer(mes %||% 0L), sep = "|")
+}
+
+#' A sonda já baixou tudo o que o download pediria?
+#'
+#' A sonda busca uma UF, o ano inicial e, em sistema mensal, só o mês inicial.
+#' Quando o recorte pedido é exatamente isso, baixar de novo seria repetir o
+#' mesmo arquivo: é o caso comum de um sistema anual com uma UF e um ano, em que
+#' a sonda sozinha já custa o download inteiro.
+#'
+#' `meta` é o recorte que a sonda efetivamente baixou:
+#' `list(sistema =, uf =, ano =, mes =)`.
+sonda_cobre_recorte <- function(p, meta) {
+  if (is.null(meta) || is.null(p)) return(FALSE)
+
+  # "Brasil inteiro" e seleção múltipla nunca são cobertos: a sonda vê uma UF.
+  if (isTRUE(p$todas_ufs) || identical(p$ufs, "all")) return(FALSE)
+  if (length(p$ufs) != 1L) return(FALSE)
+  if (!identical(as.character(p$ufs[1]), as.character(meta$uf))) return(FALSE)
+
+  if (!identical(p$sistema, meta$sistema)) return(FALSE)
+
+  if (!escalar_valido(p$ano_inicio) || !escalar_valido(p$ano_fim)) return(FALSE)
+  if (as.integer(p$ano_inicio) != as.integer(p$ano_fim)) return(FALSE)
+  if (as.integer(p$ano_inicio) != as.integer(meta$ano)) return(FALSE)
+
+  if (isTRUE(p$mensal)) {
+    if (!escalar_valido(p$mes_inicio) || !escalar_valido(p$mes_fim)) return(FALSE)
+    if (as.integer(p$mes_inicio) != as.integer(p$mes_fim)) return(FALSE)
+    if (as.integer(p$mes_inicio) != as.integer(meta$mes)) return(FALSE)
+  }
+
+  TRUE
+}
+
+#' Rótulo do botão principal, conforme a seleção de colunas.
+rotulo_botao_baixar <- function(n_colunas) {
+  if (is.null(n_colunas) || n_colunas == 0L) return("Baixar tudo")
+  sprintf("Baixar %d coluna%s", n_colunas, if (n_colunas > 1L) "s" else "")
+}

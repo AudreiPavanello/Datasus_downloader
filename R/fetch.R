@@ -38,10 +38,17 @@ nova_tarefa_sonda <- function() shiny::ExtendedTask$new(function(p) {
 
       if (is.null(dados)) dados <- data.frame()
 
+      # Gravado para que o passo 2 possa reaproveitá-lo quando o recorte pedido
+      # for exatamente o que a sonda baixou, em vez de baixar de novo.
+      caminho <- tempfile(pattern = "sonda_", fileext = ".rds")
+      saveRDS(dados, caminho, compress = FALSE)
+
       list(
         colunas = names(dados),
         amostra = utils::head(as.data.frame(dados), 200L),
-        n = nrow(dados)
+        n = nrow(dados),
+        caminho = caminho,
+        bytes = file.size(caminho)
       )
     },
     ano = p$ano, mes = p$mes, uf = p$uf, sis = p$sistema, tmo = p$timeout
@@ -58,19 +65,31 @@ nova_tarefa_sonda <- function() shiny::ExtendedTask$new(function(p) {
 nova_tarefa_download <- function() shiny::ExtendedTask$new(function(p) {
   mirai::mirai(
     {
-      dados <- microdatasus::fetch_datasus(
-        year_start = ano_i,
-        year_end = ano_f,
-        month_start = if (mes_i == 0L) NULL else mes_i,
-        month_end = if (mes_f == 0L) NULL else mes_f,
-        uf = ufs,
-        information_system = sis,
-        vars = if (length(colunas) == 0L) NULL else colunas,
-        timeout = tmo,
-        stop_on_error = soe,
-        track_source = trk,
-        quiet = TRUE
-      )
+      dados <- if (nzchar(origem) && file.exists(origem)) {
+        # A sonda já baixou exatamente este recorte. Reusar o arquivo dela em
+        # vez de repetir o download: aqui o recorte de colunas é feito em
+        # memória, já que todas elas estão presentes.
+        bruto <- readRDS(origem)
+        if (length(colunas) > 0L) {
+          bruto[, intersect(colunas, names(bruto)), drop = FALSE]
+        } else {
+          bruto
+        }
+      } else {
+        microdatasus::fetch_datasus(
+          year_start = ano_i,
+          year_end = ano_f,
+          month_start = if (mes_i == 0L) NULL else mes_i,
+          month_end = if (mes_f == 0L) NULL else mes_f,
+          uf = ufs,
+          information_system = sis,
+          vars = if (length(colunas) == 0L) NULL else colunas,
+          timeout = tmo,
+          stop_on_error = soe,
+          track_source = trk,
+          quiet = TRUE
+        )
+      }
 
       if (is.null(dados)) dados <- data.frame()
 
@@ -119,7 +138,8 @@ nova_tarefa_download <- function() shiny::ExtendedTask$new(function(p) {
     ufs = p$ufs, sis = p$sistema, colunas = p$vars,
     tmo = p$timeout, soe = p$stop_on_error, trk = p$track_source,
     proc = p$processador, psis = p$proc_sis,
-    muni = p$municipality_data, lookup = p$lookups
+    muni = p$municipality_data, lookup = p$lookups,
+    origem = p$caminho_origem
   )
 })
 

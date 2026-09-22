@@ -102,17 +102,27 @@ mod_download_ui <- function(id) {
 
       shiny::hr(),
 
+      # Filtrar colunas é opcional e fica ANTES do botão principal, para a
+      # coluna esquerda se ler como "se quiser, refine; agora baixe". Deixar o
+      # download escondido atrás da exploração obrigava quem quer o conjunto
+      # inteiro a passar por uma etapa que não lhe serve.
       bslib::input_task_button(
-        ns("explorar"), "1. Explorar colunas",
-        icon = bsicons::bs_icon("search"),
-        label_busy = "Explorando..."
+        ns("explorar"), "Escolher colunas",
+        icon = bsicons::bs_icon("funnel"),
+        label_busy = "Lendo colunas...",
+        type = "secondary",
+        class = "w-100"
+      ),
+      shiny::p(
+        class = "text-muted small mt-2 mb-2",
+        "Opcional. Menos colunas deixa o download bem mais rápido; sem isso, vêm todas."
       ),
 
       shiny::conditionalPanel(
         condition = sprintf("output['%s']", ns("tem_colunas")),
         shiny::selectizeInput(
           ns("vars"),
-          rotulo("Colunas", "Quanto menos colunas, mais rápido o download. Vazio traz todas."),
+          rotulo("Colunas", "Vazio traz todas as colunas."),
           choices = NULL, multiple = TRUE,
           options = list(placeholder = "Todas as colunas")
         ),
@@ -120,12 +130,14 @@ mod_download_ui <- function(id) {
           class = "d-flex gap-2 mb-3",
           shiny::actionButton(ns("todas_colunas"), "Todas", class = "btn-sm btn-outline-secondary"),
           shiny::actionButton(ns("limpar_colunas"), "Limpar", class = "btn-sm btn-outline-secondary")
-        ),
-        bslib::input_task_button(
-          ns("baixar"), "2. Preparar download",
-          icon = bsicons::bs_icon("cloud-arrow-down"),
-          label_busy = "Baixando..."
         )
+      ),
+
+      bslib::input_task_button(
+        ns("baixar"), "Baixar tudo",
+        icon = bsicons::bs_icon("cloud-arrow-down"),
+        label_busy = "Baixando...",
+        class = "w-100"
       ),
 
       shiny::conditionalPanel(
@@ -168,6 +180,19 @@ mod_download_server <- function(id) {
     resultado_sonda <- shiny::reactiveVal(NULL)
     resultado_download <- shiny::reactiveVal(NULL)
 
+    # Recorte que a sonda efetivamente baixou, para decidir se o passo 2 pode
+    # reusar o arquivo dela em vez de ir à rede de novo.
+    sonda_meta <- shiny::reactiveVal(NULL)
+
+    # Sondas já feitas nesta sessão, por recorte. Sem isto, clicar duas vezes
+    # em "Escolher colunas" baixa duas vezes.
+    cache_sonda <- shiny::reactiveValues()
+
+    # Recorte da sonda em voo. Guardado no disparo, não lido dos inputs na
+    # chegada: o usuário pode mexer nos campos enquanto o download acontece, e
+    # aí os inputs já não descrevem o que foi baixado.
+    meta_pendente <- shiny::reactiveVal(NULL)
+
     # ---- Seletor família -> conjunto de dados ----
 
     shiny::observeEvent(input$familia, {
@@ -184,6 +209,7 @@ mod_download_server <- function(id) {
     shiny::observeEvent(input$layout, {
       resultado_sonda(NULL)
       resultado_download(NULL)
+      sonda_meta(NULL)
       alerta(NULL)
     }, ignoreInit = TRUE)
 
@@ -258,6 +284,16 @@ mod_download_server <- function(id) {
       # Para "Brasil inteiro" sondamos o Acre: o layout de colunas é o mesmo em
       # qualquer UF e é o menor arquivo, então a exploração sai barata.
       uf_sonda <- if (p$todas_ufs) "AC" else p$ufs[1]
+      chave <- chave_sonda(p$sistema, uf_sonda, p$ano_inicio, p$mes_inicio)
+
+      em_cache <- cache_sonda[[chave]]
+      if (!is.null(em_cache) && file.exists(em_cache$resultado$caminho)) {
+        aplicar_sonda(em_cache$resultado, em_cache$meta, do_cache = TRUE)
+        return()
+      }
+
+      meta_pendente(list(sistema = p$sistema, uf = uf_sonda,
+                         ano = as.integer(p$ano_inicio), mes = p$mes_inicio))
 
       sonda$invoke(list(
         ano = as.integer(p$ano_inicio),
@@ -267,6 +303,33 @@ mod_download_server <- function(id) {
         timeout = p$timeout
       ))
     })
+
+    # Um único lugar que consome o resultado de uma sonda, venha ela da rede ou
+    # do cache.
+    aplicar_sonda <- function(r, meta, do_cache = FALSE) {
+      resultado_sonda(r)
+      sonda_meta(meta)
+
+      if (length(r$colunas) == 0) {
+        alerta(list(tipo = "warning", texto = paste(
+          "O DATASUS não retornou dados para esse recorte.",
+          "Confira o estado e o período."
+        )))
+        return(invisible(NULL))
+      }
+
+      shiny::updateSelectizeInput(session, "vars",
+                                  choices = r$colunas,
+                                  selected = character(0),
+                                  server = TRUE)
+
+      alerta(list(tipo = "success", texto = sprintf(
+        "%d colunas disponíveis%s. Selecione as que interessam, ou baixe tudo.",
+        length(r$colunas),
+        if (do_cache) " (já lidas antes, sem novo download)" else ""
+      )))
+      invisible(NULL)
+    }
 
     shiny::observeEvent(sonda$status(), {
       estado <- sonda$status()
@@ -281,25 +344,14 @@ mod_download_server <- function(id) {
       if (!identical(estado, "success")) return()
 
       r <- sonda$result()
-      resultado_sonda(r)
 
-      if (length(r$colunas) == 0) {
-        alerta(list(tipo = "warning", texto = paste(
-          "O DATASUS não retornou dados para esse recorte.",
-          "Confira o estado e o período."
-        )))
-        return()
-      }
+      meta <- shiny::isolate(meta_pendente())
+      if (is.null(meta)) return()
 
-      shiny::updateSelectizeInput(session, "vars",
-                                  choices = r$colunas,
-                                  selected = character(0),
-                                  server = TRUE)
+      chave <- chave_sonda(meta$sistema, meta$uf, meta$ano, meta$mes)
+      cache_sonda[[chave]] <- list(resultado = r, meta = meta)
 
-      alerta(list(tipo = "success", texto = sprintf(
-        "Encontradas %d colunas. Escolha as que interessam e siga para o passo 2.",
-        length(r$colunas)
-      )))
+      aplicar_sonda(r, meta)
     }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$todas_colunas, {
@@ -328,6 +380,22 @@ mod_download_server <- function(id) {
         return()
       }
 
+      # Quando a sonda já baixou exatamente este recorte, o arquivo dela é
+      # reusado e não há segundo download. É o caso de um sistema anual com uma
+      # UF e um ano, em que a sonda sozinha já custa o download inteiro.
+      s <- resultado_sonda()
+      reusar <- !is.null(s) &&
+        sonda_cobre_recorte(p, sonda_meta()) &&
+        !is.null(s$caminho) &&
+        file.exists(s$caminho)
+
+      if (reusar) {
+        alerta(list(tipo = "info", texto = paste(
+          "Este recorte já foi baixado ao ler as colunas.",
+          "Preparando o arquivo sem baixar de novo."
+        )))
+      }
+
       download$invoke(list(
         ano_inicio = as.integer(p$ano_inicio),
         ano_fim = as.integer(p$ano_fim),
@@ -342,9 +410,17 @@ mod_download_server <- function(id) {
         processador = p$processador,
         proc_sis = p$proc_sis,
         municipality_data = p$municipality_data,
-        lookups = p$lookups
+        lookups = p$lookups,
+        caminho_origem = if (reusar) s$caminho else ""
       ))
     })
+
+    # O rótulo do botão principal diz o que ele vai fazer agora, para que
+    # ninguém precise lembrar se selecionou colunas ou não.
+    shiny::observeEvent(input$vars, {
+      shiny::updateActionButton(session, "baixar",
+                                label = rotulo_botao_baixar(length(input$vars)))
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
 
     shiny::observeEvent(download$status(), {
       estado <- download$status()
@@ -411,7 +487,7 @@ mod_download_server <- function(id) {
       d <- dados_exibidos()
       shiny::validate(shiny::need(
         !is.null(d) && nrow(d) > 0,
-        "Escolha um recorte e clique em 'Explorar colunas' para ver uma prévia."
+        "Defina o recorte e clique em 'Baixar tudo', ou em 'Escolher colunas' para filtrar antes."
       ))
       DT::datatable(
         d,
@@ -491,6 +567,13 @@ mod_download_server <- function(id) {
     session$onSessionEnded(function() {
       r <- shiny::isolate(resultado_download())
       if (!is.null(r) && file.exists(r$caminho)) unlink(r$caminho)
+
+      # Os daemons vivem enquanto o app vive, então os temporários das sondas
+      # não somem sozinhos ao fim da sessão.
+      for (k in shiny::isolate(names(cache_sonda))) {
+        caminho <- shiny::isolate(cache_sonda[[k]])$resultado$caminho
+        if (!is.null(caminho) && file.exists(caminho)) unlink(caminho)
+      }
     })
 
     # Exposto para a aba de dicionário.

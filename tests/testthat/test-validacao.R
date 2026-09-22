@@ -77,3 +77,87 @@ test_that("checar_limite_xlsx só reclama acima do limite do Excel", {
   expect_match(checar_limite_xlsx(LIMITE_XLSX + 1), "Excel")
   expect_null(checar_limite_xlsx(NA))
 })
+
+# ---- Reaproveitamento da sonda --------------------------------------------
+
+recorte <- function(..., sistema = "SIM-DO", ufs = "SP", todas_ufs = FALSE,
+                    ano_inicio = 2023, ano_fim = 2023, mensal = FALSE,
+                    mes_inicio = 0L, mes_fim = 0L) {
+  list(sistema = sistema, ufs = ufs, todas_ufs = todas_ufs,
+       ano_inicio = ano_inicio, ano_fim = ano_fim, mensal = mensal,
+       mes_inicio = mes_inicio, mes_fim = mes_fim)
+}
+
+meta_anual <- list(sistema = "SIM-DO", uf = "SP", ano = 2023, mes = 0L)
+meta_mensal <- list(sistema = "SIA-PA", uf = "SP", ano = 2024, mes = 3L)
+
+test_that("uma UF e um ano num sistema anual já estão cobertos pela sonda", {
+  # É o caso que motivou a correção: a sonda baixa o arquivo inteiro de SP/2023
+  # e, sem isto, o passo 2 baixava o mesmo arquivo de novo.
+  expect_true(sonda_cobre_recorte(recorte(), meta_anual))
+})
+
+test_that("um único mês igual ao sondado está coberto", {
+  p <- recorte(sistema = "SIA-PA", ano_inicio = 2024, ano_fim = 2024,
+               mensal = TRUE, mes_inicio = 3L, mes_fim = 3L)
+  expect_true(sonda_cobre_recorte(p, meta_mensal))
+})
+
+test_that("Brasil inteiro nunca está coberto", {
+  expect_false(sonda_cobre_recorte(recorte(ufs = "all", todas_ufs = TRUE), meta_anual))
+  expect_false(sonda_cobre_recorte(recorte(ufs = "all"), meta_anual))
+})
+
+test_that("mais de uma UF não está coberta", {
+  expect_false(sonda_cobre_recorte(recorte(ufs = c("SP", "RJ")), meta_anual))
+})
+
+test_that("UF diferente da sondada não está coberta", {
+  expect_false(sonda_cobre_recorte(recorte(ufs = "RJ"), meta_anual))
+})
+
+test_that("intervalo de mais de um ano não está coberto", {
+  expect_false(sonda_cobre_recorte(recorte(ano_inicio = 2022, ano_fim = 2023), meta_anual))
+})
+
+test_that("ano diferente do sondado não está coberto", {
+  expect_false(sonda_cobre_recorte(recorte(ano_inicio = 2022, ano_fim = 2022), meta_anual))
+})
+
+test_that("período mensal de jan a dez não está coberto pela sonda de um mês", {
+  p <- recorte(sistema = "SIA-PA", ano_inicio = 2024, ano_fim = 2024,
+               mensal = TRUE, mes_inicio = 1L, mes_fim = 12L)
+  expect_false(sonda_cobre_recorte(p, meta_mensal))
+})
+
+test_that("mês único diferente do sondado não está coberto", {
+  p <- recorte(sistema = "SIA-PA", ano_inicio = 2024, ano_fim = 2024,
+               mensal = TRUE, mes_inicio = 5L, mes_fim = 5L)
+  expect_false(sonda_cobre_recorte(p, meta_mensal))
+})
+
+test_that("sistema diferente do sondado não está coberto", {
+  expect_false(sonda_cobre_recorte(recorte(sistema = "SINASC"), meta_anual))
+})
+
+test_that("sem sonda não há cobertura", {
+  expect_false(sonda_cobre_recorte(recorte(), NULL))
+  expect_false(sonda_cobre_recorte(NULL, meta_anual))
+})
+
+test_that("ano vazio não é tratado como cobertura", {
+  expect_false(sonda_cobre_recorte(recorte(ano_inicio = NULL, ano_fim = NULL), meta_anual))
+})
+
+test_that("chave_sonda distingue os recortes", {
+  expect_equal(chave_sonda("SIM-DO", "SP", 2023, 0L), "SIM-DO|SP|2023|0")
+  expect_false(identical(chave_sonda("SIA-PA", "SP", 2024, 1L),
+                         chave_sonda("SIA-PA", "SP", 2024, 2L)))
+})
+
+test_that("o rótulo do botão diz o que vai acontecer", {
+  expect_equal(rotulo_botao_baixar(0L), "Baixar tudo")
+  expect_equal(rotulo_botao_baixar(NULL), "Baixar tudo")
+  expect_equal(rotulo_botao_baixar(1L), "Baixar 1 coluna")
+  expect_equal(rotulo_botao_baixar(5L), "Baixar 5 colunas")
+})

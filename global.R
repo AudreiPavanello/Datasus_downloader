@@ -26,8 +26,15 @@ if (utils::packageVersion("microdatasus") < "3.0.0") {
 # Processos separados para o trabalho de rede. Sem isso, um download longo
 # bloqueia o processo do Shiny e congela todas as sessões que ele atende, o que
 # no shinyapps.io significa todos os usuários daquela instância.
+#
+# O default é 1 porque cada daemon é um processo R que segura o data.frame
+# inteiro durante o download, e a instância gratuita do shinyapps.io tem 1 GB.
+# Em instância maior, suba com DATASUS_DAEMONS=4.
+n_daemons <- suppressWarnings(as.integer(Sys.getenv("DATASUS_DAEMONS", "1")))
+if (is.na(n_daemons) || n_daemons < 1L) n_daemons <- 1L
+
 if (mirai::daemons()$connections == 0) {
-  mirai::daemons(2)
+  mirai::daemons(n_daemons)
 }
 
 # Uploads não são usados, mas o limite padrão de 5 MB também afeta downloads

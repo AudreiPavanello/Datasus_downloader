@@ -14,15 +14,17 @@ mod_instrucoes_ui <- function() {
                          " o conjunto é o layout específico dentro dela."),
           shiny::tags$li(shiny::strong("Defina estado e período."),
                          " Sistemas mensais mostram também os seletores de mês."),
-          shiny::tags$li(shiny::strong("Clique em 'Explorar colunas'."),
-                         " O app baixa uma fatia mínima só para descobrir quais",
-                         " colunas existem naquele conjunto."),
-          shiny::tags$li(shiny::strong("Selecione as colunas que interessam."),
-                         " Este é o passo que mais economiza tempo: o download",
-                         " seguinte lê apenas elas."),
-          shiny::tags$li(shiny::strong("Clique em 'Preparar download'."),
-                         " Agora sim o período inteiro é baixado."),
+          shiny::tags$li(shiny::strong("Clique em 'Baixar tudo'."),
+                         " Pronto: o conjunto inteiro é baixado com todas as colunas."),
           shiny::tags$li(shiny::strong("Escolha o formato e salve."))
+        ),
+        shiny::p(
+          class = "mb-0",
+          shiny::strong("Opcional:"), " antes de baixar, clique em",
+          shiny::strong("'Escolher colunas'"), ". O app lê uma fatia mínima do",
+          " recorte, lista as colunas disponíveis e passa a baixar só as que",
+          " você marcar. Em recortes grandes isso muda tudo; em recortes",
+          " pequenos, tanto faz."
         )
       )
     ),
